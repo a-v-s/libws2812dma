@@ -1,3 +1,33 @@
+/*
+
+File: 		pwmdma_stm32.c
+Author:		André van Schoubroeck
+License:	MIT
+
+
+MIT License
+
+Copyright (c) 2017, 2018, 2019 André van Schoubroeck
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+*/
+
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_hal_dma.h"
 #include "stm32f1xx_hal_tim.h"
@@ -6,27 +36,26 @@
 
 #include <stdbool.h>
 
-extern bool buffer_state[];
-extern bool timer_state[];
+ bool buffer_state[];
+ bool timer_state[];
 
-extern uint8_t data_c0[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
-extern uint8_t data_c1[512];  // 1 Clocked channels of 96 LEDS
+ uint8_t data_c0[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 
-void pins_init() {
+void tim2_init() {
 	GPIO_InitTypeDef GPIO_InitStruct;
-
-	// Enable Timer 2 Clock
-	__HAL_RCC_TIM2_CLK_ENABLE()
-	;
-
-	// Enable GPIO Port A Clock
-	__HAL_RCC_GPIOA_CLK_ENABLE()
-	;
 
 	// Common configuration for all channels
 	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+
+	// Enable Timer 2 Clock
+	__HAL_RCC_TIM2_CLK_ENABLE();
+
+
+	// Enable GPIO Port A Clock
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+
 
 	// Pins for timer 2
 
@@ -45,7 +74,27 @@ void pins_init() {
 	// Apply pin configuration to PA3
 	GPIO_InitStruct.Pin = GPIO_PIN_3;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
 
+
+void tim3_init() {
+
+	GPIO_InitTypeDef GPIO_InitStruct;
+
+	// Common configuration for all channels
+	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+
+	// Enable Timer 3 Clock
+	__HAL_RCC_TIM3_CLK_ENABLE();
+
+
+	// Enable GPIO Port A Clock
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+
+	// Enable GPIO Port B Clock
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 
 	// Pins for timer 3
 	// Apply pin configuration to PA6
@@ -56,9 +105,6 @@ void pins_init() {
 	GPIO_InitStruct.Pin = GPIO_PIN_7;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-	// Enable GPIO Port B Clock
-	__HAL_RCC_GPIOB_CLK_ENABLE()
-	;
 
 	// Apply pin configuration to PB0
 	GPIO_InitStruct.Pin = GPIO_PIN_0;
@@ -67,10 +113,12 @@ void pins_init() {
 	// Apply pin configuration to PB1
 	GPIO_InitStruct.Pin = GPIO_PIN_1;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
 }
 
-
+void pins_init() {
+    tim2_init();
+    tim3_init();
+}
 
 void pwm_set_xchannels(TIM_TypeDef *tim, int firstChannel, int nrChannels) {
 	if (firstChannel + nrChannels <= 4 ) {
@@ -79,7 +127,7 @@ void pwm_set_xchannels(TIM_TypeDef *tim, int firstChannel, int nrChannels) {
 		tim->DCR &= ~TIM_DCR_DBA_Msk;
 		tim->DCR |= ((13 + firstChannel) << TIM_DCR_DBA_Pos); // DMA Transfer Base address CCR1 + channel (0-3)
 		tim->DCR &= ~TIM_DCR_DBL_Msk;
-		tim->DCR |= ((nrChannels - 1) << TIM_DCR_DBL_Pos); // 4 Transfer at a time (CCR1 to CCR4)
+		tim->DCR |= ((nrChannels - 1) << TIM_DCR_DBL_Pos); // nr of transfers a time (CCR1 to CCR4)
 		tim->CR1 |= 0x0001; // enable
 		__DSB();
 	}
@@ -105,28 +153,29 @@ void pwm_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 
 	dma->CCR |= DMA_CCR_TEIE; // Enable transfer error interrupt
 
+
+
+    // I have used these values in the old code. However, I can't derive them
+    // 72 MHz / (9+1) = 7.2 MHz
+    // 7.2 MHz / 8 = 900 kHz. 
+    // We should have 800 kHz, shouldn't we? So why did this work? 
+	//tim->PSC = 9; // Prescaler. 
+	//tim->ARR = 8; // Reload Value
+
+
+    // We need to generate a signal on 800 kHz
+	tim->PSC = 8; // Prescaler: 72 MHZ / (8+1) = 8 MHz 
+	tim->ARR = 10; // Reload Value 8 MHz / 10 = 800 kHz
+
+    // DMA will be configured when we initiate a transfer. At this point, 
+    // clear all DMA related settings 
+
+    // Disable DMA.
+	tim->DIER = 0;
+    // Clear DMA settings.
 	tim->DCR = 0;
 
-	/*
-	//  So we need to change this to also allow single channel transfers
-	tim->DCR |= ((13) << TIM_DCR_DBA_Pos); // DMA Transfer Base address CCR1
-	tim->DCR |= ((3) << TIM_DCR_DBL_Pos); // 4 Transfer at a time (CCR1 to CCR4)
-	*/
-
-	// For led strips
-	tim->PSC = 9; // Prescaler
-	tim->ARR = 8; // Reload Value
-
-	/*
-	// Testing for through hole
-	tim->PSC = 9; // Prescaler
-	tim->ARR = 16; // Reload Value
-	*/
-
-
-	tim->DIER = 0;
-	//tim->DIER |= TIM_DIER_UDE; // Update DMA Request Enable
-
+    // Configure each channel for PWM
 	tim->CCMR1 = 0;
 	tim->CCMR1 |= (0b110 << TIM_CCMR1_OC1M_Pos); // pwm mode 1
 	tim->CCMR1 |= (0b110 << TIM_CCMR1_OC2M_Pos); // pwm mode 1
@@ -135,30 +184,27 @@ void pwm_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 	tim->CCMR2 |= (0b110 << TIM_CCMR2_OC3M_Pos); // pwm mode 1
 	tim->CCMR2 |= (0b110 << TIM_CCMR2_OC4M_Pos); // pwm mode 1
 
-	tim->CCMR1 |= TIM_CCMR1_OC1PE; //(1 << TIM_CCMR1_OC1PE_Pos); // output compare preload enable
-	tim->CCMR1 |= TIM_CCMR1_OC2PE; //(1 << TIM_CCMR1_OC2PE_Pos); // output compare preload enable
+	tim->CCMR1 |= TIM_CCMR1_OC1PE; // output compare preload enable
+	tim->CCMR1 |= TIM_CCMR1_OC2PE; // output compare preload enable
 
-	tim->CCMR2 |= TIM_CCMR2_OC3PE; //(1 << TIM_CCMR2_OC3PE_Pos); // output compare preload enable
-	tim->CCMR2 |= TIM_CCMR2_OC4PE; //(1 << TIM_CCMR2_OC4PE_Pos); // output compare preload enable
+	tim->CCMR2 |= TIM_CCMR2_OC3PE; // output compare preload enable
+	tim->CCMR2 |= TIM_CCMR2_OC4PE; // output compare preload enable
 
-	// This I forgot
+	// Set Output Enable for all Channels
 	tim->CCER = TIM_CCER_CC1E | TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E;
-
-
 
 	tim->CR1 |= 1 << 7; // auto reload enable
 	tim->CR1 &= ~(0b1110000); // Edge aglined, upcounting
 	tim->CR1 |= 0b100; // Event source, only over/underflow
-	//tim->CR1 |= 0x0001; // enable
-
 }
+
 
 void start_dma_transer2(char* memory, size_t size, DMA_Channel_TypeDef *dma,
 		TIM_TypeDef *tim) {
 
-	DisableInterrupts;
+	__disable_irq();
 	buffer_state[0] = true;
-	EnableInterrupts;
+	__enable_irq();
 
 	switch ((uint32_t) tim) {
 	case (uint32_t) TIM2:
@@ -257,9 +303,9 @@ void DMA1_Channel2_IRQHandler(void) {
 	TIM2->RCR = 32; // Keep reset time for 32 bits (RGBW)
 	TIM2->DIER = TIM_DIER_UIE; // Update Interrupt Enable
 
-	DisableInterrupts;
+	__disable_irq();
 	buffer_state[0] = false;
-	EnableInterrupts;
+	__enable_irq();
 }
 
 void DMA1_Channel3_IRQHandler(void) {
@@ -275,9 +321,9 @@ void DMA1_Channel3_IRQHandler(void) {
 	TIM3->RCR = 32; // Keep reset time for 32 bits (RGBW)
 	TIM3->DIER = TIM_DIER_UIE; // Update Interrupt Enable
 
-	DisableInterrupts;
+	__disable_irq();
 	buffer_state[0] = false;
-	EnableInterrupts;
+	__enable_irq();
 
 }
 
@@ -291,9 +337,13 @@ void DMA1_Channel7_IRQHandler(void) {
 	TIM4->CCR3 = 0;
 	TIM4->CCR4 = 0;
 
-	DisableInterrupts;
+
+
+	__disable_irq();
 	buffer_state[0] = false;
-	EnableInterrupts;
+	__enable_irq();
+
+
 
 }
 
