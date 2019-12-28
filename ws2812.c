@@ -48,16 +48,16 @@ static int bits_per_colour = 8;
 
 // This function converts byte data to per-bit values for a PWM (duty cycle)
 // DMA transfer
-bool fill_buffer_decompress(uint16_t offset, uint16_t amount, uint8_t *data) {
+bool pwmdma_fill_buffer_decompress(uint16_t offset, uint16_t amount, uint8_t *data) {
 	for (int count = 0 ; count < amount; count++)
 		for (int bit_nr = 0; bit_nr < bits_per_colour; bit_nr++) {
 			uint8_t byteval = data[count];
 			int mask = 1 << bit_nr;
 			uint8_t val = (byteval & mask) ? pwm_val_1 : pwm_val_0;
 			uint32_t index = ( ( bits_per_colour - 1) - bit_nr  ) + (8 * (offset + count));
-			if (index > sizeof(data_c0))
+			if (index > sizeof(pwmdma_data_c0))
 				return false;
-			data_c0[index] = val;
+			pwmdma_data_c0[index] = val;
 		}
 	return true;
 }

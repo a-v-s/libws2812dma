@@ -1,62 +1,74 @@
 #include "stm32f1xx.h"
 #include "stm32f1xx_hal.h"
 
-extern uint8_t data_c0[];
+#pragma pack(push,1)
 
-void voorbeeld();
+typedef struct {
+	uint8_t g;
+	uint8_t r;
+	uint8_t b;
+} rgb_t;
+
+rgb_t leds[8];
+
+#pragma pack(pop)
+
 void SystemClock_Config(void);
 
 int main() {
 	HAL_Init(); // Reset of all peripherals, Initializes the Flash interface and the Systick.
 	SystemClock_Config(); // Configure the system clock to 72 MHz
-	pwm_init();
-	voorbeeld();
-	while (1);
+	pwmdma_init();
+
+	leds[0].r = 16;
+	leds[0].g = 0;
+	leds[0].b = 0;
+
+	leds[1].r = 16;
+	leds[1].g = 8;
+	leds[1].b = 0;
+
+	leds[2].r = 8;
+	leds[2].g = 8;
+	leds[2].b = 0;
+
+	leds[3].r = 0;
+	leds[3].g = 8;
+	leds[3].b = 0;
+
+	leds[4].r = 0;
+	leds[4].g = 8;
+	leds[4].b = 16;
+
+	leds[5].r = 8;
+	leds[5].g = 0;
+	leds[5].b = 8;
+
+	leds[6].r = 16;
+	leds[6].g = 0;
+	leds[6].b= 16;
+
+	leds[7].r = 8;
+	leds[7].g = 8;
+	leds[7].b = 8;
+
+	while (pwmdma_is_busy());
+	pwmdma_fill_buffer_decompress(0, sizeof(leds), &leds);
+	pwmdma_apply(sizeof(leds));
+
+	while (1) {
+		HAL_Delay(250);
+		rgb_t tmp = leds[0];
+		for (int i = 0 ; i <7; i++) {
+			leds[i]=leds[i+1];
+		}
+		leds[7]=tmp;
+		while (pwmdma_is_busy());
+		pwmdma_fill_buffer_decompress(0, sizeof(leds), &leds);
+		pwmdma_apply(sizeof(leds));
+	}
 }
 
-void voorbeeld() {
-	//uint8_t b[8*3]; // 8 leds, 3 colours per led
-	uint8_t b[32] = { 0 };
-
-	b[1] = 16;
-	b[0] = 0;
-	b[2] = 0;
-
-	b[4] = 16;
-	b[3] = 8;
-	b[5] = 0;
-
-	b[7] = 8;
-	b[6] = 8;
-	b[8] = 0;
-
-	b[10] = 0;
-	b[9] = 8;
-	b[11] = 0;
-
-	b[13] = 0;
-	b[12] = 8;
-	b[14] = 16;
-
-	b[16] = 8;
-	b[15] = 0;
-	b[17] = 8;
-
-	b[19] = 16;
-	b[18] = 0;
-	b[20] = 16;
-
-	b[22] = 8;
-	b[21] = 8;
-	b[23] = 8;
-
-	while (is_busy());
-
-	fill_buffer_decompress(0, 24, b);
-	pwm_set_xchannels(TIM2, 0, 1);
-	start_dma_transer2(data_c0, 8 * 3 * 8, DMA1_Channel2, TIM2);
-
-}
 
 /**
  * @brief  System Clock Configuration

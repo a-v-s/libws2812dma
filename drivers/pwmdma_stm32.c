@@ -36,12 +36,12 @@ SOFTWARE.
 
 #include <stdbool.h>
 
- bool buffer_state[];
- bool timer_state[];
+ bool buffer_state[3];
+ bool timer_state[3];
 
- uint8_t data_c0[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
+ uint8_t pwmdma_data_c0[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 
-void tim2_init() {
+void pwmdma_tim2_init() {
 	GPIO_InitTypeDef GPIO_InitStruct;
 
 	// Common configuration for all channels
@@ -77,7 +77,7 @@ void tim2_init() {
 }
 
 
-void tim3_init() {
+void pwmdma_tim3_init() {
 
 	GPIO_InitTypeDef GPIO_InitStruct;
 
@@ -115,12 +115,12 @@ void tim3_init() {
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
-void pins_init() {
-    tim2_init();
-    tim3_init();
+void pwmdma_pins_init() {
+    pwmdma_tim2_init();
+    pwmdma_tim3_init();
 }
 
-void pwm_set_xchannels(TIM_TypeDef *tim, int firstChannel, int nrChannels) {
+void pwmdma_set_xchannels(TIM_TypeDef *tim, int firstChannel, int nrChannels) {
 	if (firstChannel + nrChannels <= 4 ) {
 		tim->CR1 &= ~0x0001; // disable
 		__DSB();
@@ -134,12 +134,12 @@ void pwm_set_xchannels(TIM_TypeDef *tim, int firstChannel, int nrChannels) {
 }
 
 
-void pwm_set_4channel(TIM_TypeDef *tim) {
-	pwm_set_xchannels(tim,0,4);
+void pwmdma_set_4channel(TIM_TypeDef *tim) {
+	pwmdma_set_xchannels(tim,0,4);
 }
 
 
-void pwm_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
+void pwmdma_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 	dma->CPAR = (uint32_t) &(tim->DMAR); // Link DMA channel to timer
 
 	dma->CCR = 0x00;
@@ -199,7 +199,7 @@ void pwm_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 }
 
 
-void start_dma_transer2(char* memory, size_t size, DMA_Channel_TypeDef *dma,
+void pwmdma_start_dma_transer2(char* memory, size_t size, DMA_Channel_TypeDef *dma,
 		TIM_TypeDef *tim) {
 
 	__disable_irq();
@@ -233,11 +233,15 @@ void start_dma_transer2(char* memory, size_t size, DMA_Channel_TypeDef *dma,
 	dma->CCR |= 1; // Enable DMA
 	tim->EGR = TIM_EGR_UG; // Trigger update event, starting the transfer
 }
-void start_dma_transer(char* memory, size_t size) {
-	start_dma_transer2(memory, size, DMA1_Channel2, TIM2);
+void pwmdma_start_dma_transer(char* memory, size_t size) {
+	pwmdma_start_dma_transer2(memory, size, DMA1_Channel2, TIM2);
 }
 
-void pwm_init() {
+void pwmdma_apply(size_t size) {
+	pwmdma_start_dma_transer2(pwmdma_data_c0, size*8, DMA1_Channel2, TIM2);
+}
+
+void pwmdma_init() {
 
 	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; // enable timer2 clock
 	RCC->AHBENR |= RCC_AHBENR_DMA1EN; // enable dma1 clock
@@ -246,15 +250,15 @@ void pwm_init() {
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN; // enable timer3 clock
 
 
-	pins_init();
+	pwmdma_pins_init();
 
 	// Datasheet page 281
 	// TIM1_UP --> DMA 1 Channel 5
 	// TIM2_UP --> DMA 1 Channel 2
 	// TIM3_UP --> DMA 1 Channel 3
 	// TIM4_UP --> DMA 1 Channel 7
-	pwm_init2(DMA1_Channel2, TIM2);
-	pwm_init2(DMA1_Channel3, TIM3);
+	pwmdma_init2(DMA1_Channel2, TIM2);
+	pwmdma_init2(DMA1_Channel3, TIM3);
 	// We could also add Timer 4, then we have 4 more channels but no I²C
 	// For Timer 1, we could add 2 channels, the other channels are in use by USB
 
@@ -270,20 +274,29 @@ void pwm_init() {
 	NVIC_ClearPendingIRQ(TIM3_IRQn);
 	NVIC_EnableIRQ(TIM3_IRQn);
 
-	memset(data_c0, 2, sizeof(data_c0));
+	// Prepare the data buffer to turn off all LEDs
+	memset(pwmdma_data_c0, 2, sizeof(pwmdma_data_c0));
 
+
+	/*
+	// Configure TIM2 and TIM3 for 4-channel output and turn off the LEDs
 	pwm_set_4channel(TIM2);
 	pwm_set_4channel(TIM3);
 	start_dma_transer2(data_c0, sizeof(data_c0), DMA1_Channel2, TIM2);
 	start_dma_transer2(data_c0, sizeof(data_c0), DMA1_Channel3, TIM3);
+	*/
+
+	// Configure TIM2 for single channel output and turn off the LEDs
+	pwmdma_set_xchannels(TIM2, 0, 1);
+	pwmdma_start_dma_transer2(pwmdma_data_c0, sizeof(pwmdma_data_c0), DMA1_Channel2, TIM2);
 
 }
 
-bool is_busy2(DMA_Channel_TypeDef *dma) {
+bool pwmdma_is_busy2(DMA_Channel_TypeDef *dma) {
 	return dma->CCR & 1;
 }
 
-bool is_busy() {
+bool pwmdma_is_busy() {
 
 	//return is_busy2(DMA1_Channel2) || is_busy2(DMA1_Channel3) ;
 

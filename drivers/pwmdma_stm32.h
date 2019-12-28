@@ -33,10 +33,11 @@ SOFTWARE.
 #include <stdbool.h>
 #include <stddef.h>
 
-extern uint8_t data_c0[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
+extern uint8_t pwmdma_data_c0[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 
-void pwm_init();
-void start_dma_transer(void* memory, size_t size);
-bool is_busy();
+void pwmdma_init();
+void pwmdma_start_dma_transer(void* memory, size_t size);
+void pwmdma_apply(size_t size);
+bool pwmdma_is_busy();
 
 #endif /* INC_PWMDMA_H_ */
