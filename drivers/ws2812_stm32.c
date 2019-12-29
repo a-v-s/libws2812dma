@@ -31,7 +31,7 @@ SOFTWARE.
 
 #include <stdbool.h>
 #include <stdint.h>
-
+#include <string.h>
 
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_hal_dma.h"
@@ -204,7 +204,7 @@ void ws2812_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 }
 
 
-void ws2812_start_dma_transer2(char* memory, size_t size, DMA_Channel_TypeDef *dma,
+void ws2812_start_dma_transer2(void* memory, size_t size, DMA_Channel_TypeDef *dma,
 		TIM_TypeDef *tim) {
 
 	__disable_irq();
