@@ -1,6 +1,6 @@
 /*
 
-File: 		pwmdma_stm32.h
+File: 		ws2812_stm32.h
 Author:		André van Schoubroeck
 License:	MIT
 
@@ -33,11 +33,15 @@ SOFTWARE.
 #include <stdbool.h>
 #include <stddef.h>
 
-extern uint8_t pwmdma_data_c0[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
+#define pwm_len (3072 * 4)
+extern uint8_t ws2812_data[pwm_len]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 
-void pwmdma_init();
-void pwmdma_start_dma_transer(void* memory, size_t size);
-void pwmdma_apply(size_t size);
-bool pwmdma_is_busy();
+#define WS2812_VAL_0 2
+#define WS2812_VAL_1 8
+
+void ws2812_init();
+void ws2812_start_dma_transer(void* memory, size_t size);
+void ws2812_apply(size_t size);
+bool ws2812_is_busy();
 
 #endif /* INC_PWMDMA_H_ */

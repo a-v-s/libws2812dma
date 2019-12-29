@@ -35,9 +35,9 @@ SOFTWARE.
 // TODO: extend these definitions for the whole family of those MCUs
 
 #if defined STM32F103xB
-#include "drivers/pwmdma_stm32.h"
-#elif defined NRF52840_XXAA
-#include "drivers/pwmdma_nrf52.h"
+#include "drivers/ws2812_stm32.h"
+#elif (defined NRF52840_XXAA) || (defined NRF52832_XXAA)
+#include "drivers/ws2812_nrfx.h"
 #else
 #error "MCU not supported"
 #endif
