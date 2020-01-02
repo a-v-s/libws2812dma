@@ -1,33 +1,32 @@
 /*
 
-File: 		ws2812_stm32.c
-Author:		André van Schoubroeck
-License:	MIT
+ File: 		ws2812_stm32.c
+ Author:	André van Schoubroeck
+ License:	MIT
 
 
-MIT License
+ MIT License
 
-Copyright (c) 2017, 2018, 2019 André van Schoubroeck
+ Copyright (c) 2017, 2018, 2019, 2020  André van Schoubroeck <andre@blaatschaap.be>
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
 
-*/
-
+ */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -37,10 +36,10 @@ SOFTWARE.
 #include "stm32f1xx_hal_dma.h"
 #include "stm32f1xx_hal_tim.h"
 
- bool buffer_state[3];
- bool timer_state[3];
+bool buffer_state[3];
+bool timer_state[3];
 
- uint8_t ws2812_data[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
+uint8_t ws2812_data[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 
 void ws2812_tim2_init() {
 	GPIO_InitTypeDef GPIO_InitStruct;
@@ -53,10 +52,8 @@ void ws2812_tim2_init() {
 	// Enable Timer 2 Clock
 	__HAL_RCC_TIM2_CLK_ENABLE();
 
-
 	// Enable GPIO Port A Clock
 	__HAL_RCC_GPIOA_CLK_ENABLE();
-
 
 	// Pins for timer 2
 
@@ -77,7 +74,6 @@ void ws2812_tim2_init() {
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
-
 void ws2812_tim3_init() {
 
 	GPIO_InitTypeDef GPIO_InitStruct;
@@ -89,7 +85,6 @@ void ws2812_tim3_init() {
 
 	// Enable Timer 3 Clock
 	__HAL_RCC_TIM3_CLK_ENABLE();
-
 
 	// Enable GPIO Port A Clock
 	__HAL_RCC_GPIOA_CLK_ENABLE();
@@ -106,7 +101,6 @@ void ws2812_tim3_init() {
 	GPIO_InitStruct.Pin = GPIO_PIN_7;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-
 	// Apply pin configuration to PB0
 	GPIO_InitStruct.Pin = GPIO_PIN_0;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -117,12 +111,12 @@ void ws2812_tim3_init() {
 }
 
 void ws2812_pins_init() {
-    ws2812_tim2_init();
-    ws2812_tim3_init();
+	ws2812_tim2_init();
+	ws2812_tim3_init();
 }
 
 void ws2812_set_xchannels(TIM_TypeDef *tim, int firstChannel, int nrChannels) {
-	if (firstChannel + nrChannels <= 4 ) {
+	if (firstChannel + nrChannels <= 4) {
 		tim->CR1 &= ~0x0001; // disable
 		__DSB();
 		tim->DCR &= ~TIM_DCR_DBA_Msk;
@@ -134,14 +128,12 @@ void ws2812_set_xchannels(TIM_TypeDef *tim, int firstChannel, int nrChannels) {
 	}
 }
 
-
 void ws2812_set_4channel(TIM_TypeDef *tim) {
-	ws2812_set_xchannels(tim,0,4);
+	ws2812_set_xchannels(tim, 0, 4);
 }
 
-
 void ws2812_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
-	dma->CPAR = (uint32_t) &(tim->DMAR); // Link DMA channel to timer
+	dma->CPAR = (uint32_t) & (tim->DMAR); // Link DMA channel to timer
 
 	dma->CCR = 0x00;
 	dma->CCR |= (0x01 << DMA_CCR_PSIZE_Pos); // Peripheral size 16 bit
@@ -154,33 +146,30 @@ void ws2812_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 
 	dma->CCR |= DMA_CCR_TEIE; // Enable transfer error interrupt
 
-
-
-    // I have used these values in the old code. However, I can't derive them
-    // 72 MHz / (9+1) = 7.2 MHz
-    // 7.2 MHz / 8 = 900 kHz. 
-    // We should have 800 kHz, shouldn't we? So why did this work? 
+	// I have used these values in the old code. However, I can't derive them
+	// 72 MHz / (9+1) = 7.2 MHz
+	// 7.2 MHz / 8 = 900 kHz.
+	// We should have 800 kHz, shouldn't we? So why did this work?
 	//tim->PSC = 9; // Prescaler. 
 	//tim->ARR = 8; // Reload Value
 
-
-    // We need to generate a signal on 800 kHz
+	// We need to generate a signal on 800 kHz
 	//tim->PSC = 8; // Prescaler: 72 MHZ / (8+1) = 8 MHz
 
 	// Calculate the prescaler by reading the current core speed rather then
 	// assuming its configured to 72 MHz
-	tim->PSC = (SystemCoreClock / 8000000) -1;
+	tim->PSC = (SystemCoreClock / 8000000) - 1;
 	tim->ARR = 10; // Reload Value 8 MHz / 10 = 800 kHz
 
-    // DMA will be configured when we initiate a transfer. At this point, 
-    // clear all DMA related settings 
+	// DMA will be configured when we initiate a transfer. At this point,
+	// clear all DMA related settings
 
-    // Disable DMA.
+	// Disable DMA.
 	tim->DIER = 0;
-    // Clear DMA settings.
+	// Clear DMA settings.
 	tim->DCR = 0;
 
-    // Configure each channel for PWM
+	// Configure each channel for PWM
 	tim->CCMR1 = 0;
 	tim->CCMR1 |= (0b110 << TIM_CCMR1_OC1M_Pos); // pwm mode 1
 	tim->CCMR1 |= (0b110 << TIM_CCMR1_OC2M_Pos); // pwm mode 1
@@ -203,9 +192,8 @@ void ws2812_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 	tim->CR1 |= 0b100; // Event source, only over/underflow
 }
 
-
-void ws2812_start_dma_transer2(void* memory, size_t size, DMA_Channel_TypeDef *dma,
-		TIM_TypeDef *tim) {
+void ws2812_start_dma_transer2(void *memory, size_t size,
+		DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 
 	__disable_irq();
 	buffer_state[0] = true;
@@ -238,12 +226,12 @@ void ws2812_start_dma_transer2(void* memory, size_t size, DMA_Channel_TypeDef *d
 	dma->CCR |= 1; // Enable DMA
 	tim->EGR = TIM_EGR_UG; // Trigger update event, starting the transfer
 }
-void ws2812_start_dma_transer(char* memory, size_t size) {
+void ws2812_start_dma_transer(char *memory, size_t size) {
 	ws2812_start_dma_transer2(memory, size, DMA1_Channel2, TIM2);
 }
 
 void ws2812_apply(size_t size) {
-	ws2812_start_dma_transer2(ws2812_data, size*8, DMA1_Channel2, TIM2);
+	ws2812_start_dma_transer2(ws2812_data, size * 8, DMA1_Channel2, TIM2);
 }
 
 void ws2812_init() {
@@ -251,9 +239,7 @@ void ws2812_init() {
 	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN; // enable timer2 clock
 	RCC->AHBENR |= RCC_AHBENR_DMA1EN; // enable dma1 clock
 
-
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN; // enable timer3 clock
-
 
 	ws2812_pins_init();
 
@@ -282,18 +268,18 @@ void ws2812_init() {
 	// Prepare the data buffer to turn off all LEDs
 	memset(ws2812_data, 2, sizeof(ws2812_data));
 
-
 	/*
-	// Configure TIM2 and TIM3 for 4-channel output and turn off the LEDs
-	pwm_set_4channel(TIM2);
-	pwm_set_4channel(TIM3);
-	start_dma_transer2(data_c0, sizeof(data_c0), DMA1_Channel2, TIM2);
-	start_dma_transer2(data_c0, sizeof(data_c0), DMA1_Channel3, TIM3);
-	*/
+	 // Configure TIM2 and TIM3 for 4-channel output and turn off the LEDs
+	 pwm_set_4channel(TIM2);
+	 pwm_set_4channel(TIM3);
+	 start_dma_transer2(data_c0, sizeof(data_c0), DMA1_Channel2, TIM2);
+	 start_dma_transer2(data_c0, sizeof(data_c0), DMA1_Channel3, TIM3);
+	 */
 
 	// Configure TIM2 for single channel output and turn off the LEDs
 	ws2812_set_xchannels(TIM2, 0, 1);
-	ws2812_start_dma_transer2(ws2812_data, sizeof(ws2812_data), DMA1_Channel2, TIM2);
+	ws2812_start_dma_transer2(ws2812_data, sizeof(ws2812_data), DMA1_Channel2,
+			TIM2);
 
 }
 
@@ -355,13 +341,9 @@ void DMA1_Channel7_IRQHandler(void) {
 	TIM4->CCR3 = 0;
 	TIM4->CCR4 = 0;
 
-
-
 	__disable_irq();
 	buffer_state[0] = false;
 	__enable_irq();
-
-
 
 }
 
