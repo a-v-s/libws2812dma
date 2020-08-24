@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define pwm_len (3072 * 4) // 4 Clockless channels of either 96 RGBW or 128 RGB leds
+#define pwm_len (3104 * 4) // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 extern uint8_t ws2812_data[pwm_len];
 
 #define WS2812_VAL_0 2

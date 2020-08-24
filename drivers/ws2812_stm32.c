@@ -39,7 +39,7 @@
 bool buffer_state[3];
 bool timer_state[3];
 
-uint8_t ws2812_data[3072 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
+uint8_t ws2812_data[3104 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 
 void ws2812_tim2_init() {
 	GPIO_InitTypeDef GPIO_InitStruct;
@@ -231,7 +231,9 @@ void ws2812_start_dma_transer(char *memory, size_t size) {
 }
 
 void ws2812_apply(size_t size) {
-	ws2812_start_dma_transer2(ws2812_data, size * 8, DMA1_Channel2, TIM2);
+
+	ws2812_start_dma_transer2(ws2812_data, 32 + (size * 8), DMA1_Channel2, TIM2);
+	memset(ws2812_data+ (size*8),0,32); // extra reset
 }
 
 void ws2812_init() {
@@ -357,7 +359,9 @@ void TIM3_IRQHandler(void) {
 	TIM3->DIER = 0;
 }
 
+/*
 void TIM4_IRQHandler(void) {
 	timer_state[2] = false;
 	TIM4->DIER = 0;
 }
+*/
