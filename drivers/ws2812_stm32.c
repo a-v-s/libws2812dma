@@ -36,8 +36,8 @@
 #include "stm32f1xx_hal_dma.h"
 #include "stm32f1xx_hal_tim.h"
 
-bool buffer_state[3];
-bool timer_state[3];
+volatile bool buffer_state[3];
+volatile bool timer_state[3];
 
 uint8_t ws2812_data[3104 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
 
@@ -231,9 +231,36 @@ void ws2812_start_dma_transer(char *memory, size_t size) {
 }
 
 void ws2812_apply(size_t size) {
-
 	ws2812_start_dma_transer2(ws2812_data, 32 + (size * 8), DMA1_Channel2, TIM2);
 	memset(ws2812_data+ (size*8),0,32); // extra reset
+}
+
+void ws2812_apply_channel(size_t size, int channel) {
+	DMA_Channel_TypeDef *dma;
+	TIM_TypeDef *tim;
+	switch (channel) {
+	case 0:
+	case 1:
+	case 2:
+	case 3:
+		dma = DMA1_Channel2;
+		tim = TIM2;
+		break;
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+		dma = DMA1_Channel3;
+		tim = TIM3;
+		break;
+	default:
+		return;
+	}
+	ws2812_set_xchannels(tim, channel % 4, 1);
+	memset(ws2812_data+ (size*8),0,32); // extra reset
+	ws2812_start_dma_transer2(ws2812_data, 32 + (size * 8), dma, tim);
+
+
 }
 
 void ws2812_init() {
