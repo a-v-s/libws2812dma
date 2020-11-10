@@ -159,7 +159,7 @@ void ws2812_init2(DMA_Channel_TypeDef *dma, TIM_TypeDef *tim) {
 	// Calculate the prescaler by reading the current core speed rather then
 	// assuming its configured to 72 MHz
 	tim->PSC = (SystemCoreClock / 8000000) - 1;
-	tim->ARR = 10; // Reload Value 8 MHz / 10 = 800 kHz
+	tim->ARR = 10 - 1; // Reload Value 8 MHz / 10 = 800 kHz
 
 	// DMA will be configured when we initiate a transfer. At this point,
 	// clear all DMA related settings
