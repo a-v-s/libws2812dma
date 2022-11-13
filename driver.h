@@ -34,7 +34,7 @@ SOFTWARE.
 
 // TODO: extend these definitions for the whole family of those MCUs
 
-#if defined STM32F103xB
+#if defined STM32F0 || defined STM32F1
 #include "drivers/ws2812_stm32.h"
 #elif (defined NRF52840_XXAA) || (defined NRF52832_XXAA)
 #include "drivers/ws2812_nrfx.h"

@@ -47,13 +47,14 @@ static int bits_per_colour = 8;
 // DMA transfer
 bool ws2812_fill_buffer_decompress(uint16_t offset, uint16_t amount,
 		uint8_t *data) {
+	memset(ws2812_data,0,8); // reset
 	for (int count = 0; count < amount; count++)
 		for (int bit_nr = 0; bit_nr < bits_per_colour; bit_nr++) {
 			uint8_t byteval = data[count];
 			int mask = 1 << bit_nr;
 			int val = (byteval & mask) ? pwm_val_1 : pwm_val_0;
-			uint32_t index = ((bits_per_colour - 1) - bit_nr)
-					+ (8 * (offset + count));
+			uint32_t index = 32 + (((bits_per_colour - 1) - bit_nr)
+					+ (8 * (offset + count)) );
 			if (index > pwm_len)
 				return false;
 			ws2812_data[index] = val;

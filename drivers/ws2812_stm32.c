@@ -32,14 +32,18 @@
 #include <stdint.h>
 #include <string.h>
 
+/*
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_hal_dma.h"
 #include "stm32f1xx_hal_tim.h"
+*/
+
+#include <system.h>
 
 volatile bool buffer_state[3];
 volatile bool timer_state[3];
 
-uint8_t ws2812_data[3104 * 4]; // 4 Clockless channels of either 96 RGBW or 128 RGB leds
+uint8_t ws2812_data[2424]; // 100 leds 
 
 void ws2812_tim2_init() {
 	GPIO_InitTypeDef GPIO_InitStruct;
